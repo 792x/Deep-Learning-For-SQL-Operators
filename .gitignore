@@ -184,3 +184,7 @@ Dataset-Framework/.bsp
 Dataset-Framework/project
 .idea
 PhoneLabs/devices
+PhoneLabs/extract/devices
+Framework/.bsp
+Framework/project
+SkyServer/db_benchmark_skyserver

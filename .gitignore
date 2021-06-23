@@ -178,3 +178,7 @@ cython_debug/
 hs_err_pid*
 
 # End of https://www.toptal.com/developers/gitignore/api/scala,python,macos
+Dataset-Framework/data
+Dataset-Framework/.idea
+Dataset-Framework/.bsp
+Dataset-Framework/project

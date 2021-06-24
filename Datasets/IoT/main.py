@@ -36,7 +36,7 @@ def merge_postgres_logs(log_path):
 
     filenames = sorted(
         [filename for filename in os.listdir(
-            path=log_path) if filename.endswith(".log") and filename != "combined.log"],
+            path=log_path) if filename.endswith(".log") and filename != "combined.log" and filename != "processed.log"],
         key=lambda x: time.mktime(time.strptime(os.path.splitext(x)[0][11:-5], "%Y-%m-%d")))
     with open(log_path + '/combined.log', 'wb') as wfd:
         for f in filenames:
@@ -45,8 +45,9 @@ def merge_postgres_logs(log_path):
 
 
 def anonimize_logs(log_path):
-    # strings [=|<|>]\s+(['][@':.+\-a-zA-Z0-9_]+['])              ([=|<|>]\s+)(['][@':.+\-a-zA-Z0-9_]+['])
-    # nums [=|<|>]\s+([^'$][0-9.,]+[^')])
+    """
+    Anonimizes the logs by replacing all parameters with placeholders (0 or '0')
+    """
     print("(2/2) Anonimizing logs")
     if os.path.isfile(log_path + '/processed.log'):
         while True:

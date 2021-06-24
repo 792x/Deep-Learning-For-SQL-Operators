@@ -189,3 +189,5 @@ Framework/.bsp
 Framework/project
 SkyServer/db_benchmark_skyserver
 Framework/data
+Datasets/PhoneLabs/devices
+Datasets/SkyServer/db_benchmark_skyserver

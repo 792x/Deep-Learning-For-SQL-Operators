@@ -24,17 +24,20 @@ object Main {
     Logger.getLogger("org.apache.spark").setLevel(Level.WARN)
     Logger.getLogger("org.spark-project").setLevel(Level.WARN)
 
-    val DATA_SET: String = "iot" // "skyserver" | "phonelabs" | "iot"
-    val DATA_DIR: String = "/Users/falker/Documents/Projects/skyserver/data/";
+    val DATA_SET: String = "phonelabs" // "skyserver" | "phonelabs" | "iot"
+    val DATA_DIR: String = "/Users/falker/Documents/Projects/Deep-Learning-For-SQL-Operators/Framework/data/";
     val LOG_DIR: String = DATA_DIR + DATA_SET + "/logs/";
     val OUTPUT_DIR: String = DATA_DIR + DATA_SET + "/output/";
     val SCHEMA_DIR: String = DATA_DIR + DATA_SET + "/schema/";
     val USE_DATA_SUBSET: Boolean = false;
+    val TOP_K = 5000;
 
     val tableCounter: mutable.HashMap[String, Int] = new mutable.HashMap[String, Int]()
     var subTreeCount: mutable.HashMap[LogicalPlan, Long] = new mutable.HashMap[LogicalPlan, Long]()
     var subTreeIds: mutable.HashMap[LogicalPlan, Long] = new mutable.HashMap[LogicalPlan, Long]()
     var dataframeSizes: Map[String, Int] = Map[String, Int]()
+
+
 
 
 
@@ -66,7 +69,7 @@ object Main {
         println("Total unique partial QEPs: " + subTreeCount.size)
         println("Top 10 frequent partial QEPs:")
         println(subTreeCount.toSeq.sortWith(_._2 > _._2).take(10))
-        println("Frequency distribution of top 5000 partial QEPs: " + subTreeCount.values.toList.sorted(Ordering.Long.reverse).take(5000))
+        println("Frequency distribution of top " + TOP_K +" partial QEPs: " + subTreeCount.values.toList.sorted(Ordering.Long.reverse).take(TOP_K))
         println("Number of partial QEPs only occurring once: " + subTreeCount.values.toList.count(_ == 1))
 
         println("Processed queries: " + processedQueries.length + " out of " + queries.length)
@@ -81,7 +84,7 @@ object Main {
      *
      * @param top_k the top_k frequent plans that are considered
      */
-    def createTreeIds(top_k: Int = 5000): Unit = {
+    def createTreeIds(top_k: Int = TOP_K): Unit = {
         val subTrees: Seq[(LogicalPlan, Long)] = subTreeCount.toSeq.sortWith(_._2 > _._2).take(top_k)
         for (i <- subTrees.indices) {
             subTreeIds(subTrees(i)._1) = i + 1
@@ -153,7 +156,7 @@ object Main {
         for (l <- src) {
 //            println(l.split(";")(3)) // can cause array out of bounds exception for some queries
             // Filter for first day and first hour only to limit number of queries
-            if (l.contains("2015-03-01") && !l.contains("sqlite_master") && !l.contains("INSERT") && l.contains("SELECT") && !l.contains("DELETE") && !l.contains("REPLACE") && !l.contains("UPSERT") && !l.contains("UPDATE")) {
+            if ((l.contains("2015-03-01") ||l.contains("2015-03-02") || l.contains("2015-03-03") || l.contains("2015-03-04") || l.contains("2015-03-05")) && !l.contains("sqlite_master") && !l.contains("INSERT") && l.contains("SELECT") && !l.contains("DELETE") && !l.contains("REPLACE") && !l.contains("UPSERT") && !l.contains("UPDATE")) {
                 // Replace question marks with 0
                 var sql_query: String = l.split(";")(3).replace("?", "0").replace("()", "(0)").replace("?group", "? group");
                 // Remove column specifiers for INSERT INTO queries and add 0 for all columns
@@ -277,12 +280,12 @@ object Main {
         println("Writing to CSV");
 
         val size: Int = encodedQueries.length
-        val halfway: Int = (size / 2)
+        val split: Int = (size * 0.8).toInt
 
-        val outputHistory: BufferedWriter = new BufferedWriter(new FileWriter(OUTPUT_DIR + "output_history.csv"))
+        val outputHistory: BufferedWriter = new BufferedWriter(new FileWriter(OUTPUT_DIR + DATA_SET + "_output_first80percent_" + TOP_K + ".csv"))
         val csvWriterHistory: CSVWriter = new CSVWriter(outputHistory)
         csvWriterHistory.writeNext("queryId", "partialQEPId")
-        for (i <- 0 until halfway) {
+        for (i <- 0 until split) {
             for(partialQEP <- encodedQueries(i)) {
                 csvWriterHistory.writeNext(i.toString, partialQEP.toString)
             }
@@ -290,10 +293,10 @@ object Main {
         outputHistory.close()
 
 
-        val outputFuture: BufferedWriter = new BufferedWriter(new FileWriter(OUTPUT_DIR + "output_future.csv"))
+        val outputFuture: BufferedWriter = new BufferedWriter(new FileWriter(OUTPUT_DIR + DATA_SET + "_output_last20percent_" + TOP_K + ".csv"))
         val csvWriterFuture: CSVWriter = new CSVWriter(outputFuture)
         csvWriterFuture.writeNext("queryId", "partialQEPId")
-        for (i <- halfway until size) {
+        for (i <- split until size) {
             for(partialQEP <- encodedQueries(i)) {
                 csvWriterFuture.writeNext(i.toString, partialQEP.toString)
             }

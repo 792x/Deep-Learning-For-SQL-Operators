@@ -1,4 +1,4 @@
-name := "skyserver"
+name := "framework"
 
 version := "0.1"
 

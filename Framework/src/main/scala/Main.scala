@@ -302,5 +302,14 @@ object Main {
             }
         }
         outputFuture.close()
+
+
+        val map: BufferedWriter = new BufferedWriter(new FileWriter(OUTPUT_DIR + DATA_SET + "_output_mapping_" + TOP_K + ".csv"))
+        val csvWriterMap: CSVWriter = new CSVWriter(map, ';')
+        csvWriterMap.writeNext("partialQEPId", "partialQEP")
+
+        subTreeIds foreach {case (key, value) => csvWriterMap.writeNext(value.toString, key.toString() + "\n")}
+
+        map.close()
     }
 }

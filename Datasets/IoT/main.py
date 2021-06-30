@@ -75,6 +75,8 @@ def anonimize_logs(log_path):
                     line = re.sub(r"(IN [(][0-9, ]*[)])", "IN (0)", line)
                     line = re.sub(r"(?<!AS )\"([\w.]+)\"", r"\g<1>", line)
                     line = re.sub(r"(?<=AS )\"([\w.]+)\"", r"`\g<1>`", line)
+                    line = re.sub(
+                    r"(BETWEEN\s+)(['][@':.+\-a-zA-Z0-9_\s]*['])", r"\g<1>'0' AND '0'", line)                   
                     if len(line) > 7:
                         wfd.write(line)
 

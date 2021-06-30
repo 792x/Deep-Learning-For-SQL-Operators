@@ -35,12 +35,9 @@ object Main {
     val tableCounter: mutable.HashMap[String, Int] = new mutable.HashMap[String, Int]()
     var subTreeCount: mutable.HashMap[LogicalPlan, Long] = new mutable.HashMap[LogicalPlan, Long]()
     var subTreeIds: mutable.HashMap[LogicalPlan, Long] = new mutable.HashMap[LogicalPlan, Long]()
+    var subTreeDependencyGraph: mutable.HashMap[LogicalPlan, Set[LogicalPlan]] = new mutable.HashMap[LogicalPlan, Set[LogicalPlan]]()
+    var subTreeIdsDependencyGraph: mutable.HashMap[Long, Set[Long]] = new mutable.HashMap[Long, Set[Long]]()
     var dataframeSizes: Map[String, Int] = Map[String, Int]()
-
-
-
-
-
 
     def main(args: Array[String]): Unit = {
         val dataframes: Map[String, DataFrame] = loadSchema()
@@ -58,13 +55,22 @@ object Main {
 
         val processedQueries: Seq[Set[LogicalPlan]] = processQueries(queries)
 
+//        subTreeCount.foreach({case (key, value) => {
+//            if(value == 1){
+//                println(key)
+//            }
+//        }})
+
         createTreeIds()
+
+        createTreeIdsDependencyGraph()
 
         val encodedQueries: Seq[Set[Long]] = encodeQueries(processedQueries)
 
         writeToCSV(encodedQueries)
 
         println("============FINISHED STATS============")
+        println("Only encoding the top " + TOP_K + " partial QEPs")
         println("Number of queries: " + queries.size)
         println("Total unique partial QEPs: " + subTreeCount.size)
         println("Top 10 frequent partial QEPs:")
@@ -75,7 +81,20 @@ object Main {
         println("Processed queries: " + processedQueries.length + " out of " + queries.length)
         println("Finished encoding queries: " + processedQueries.length + " out of " + encodedQueries.length)
 
+        val file = new File(OUTPUT_DIR + DATA_SET + "_output_stats_" + TOP_K + ".txt")
+        val bw = new BufferedWriter(new FileWriter(file))
+        bw.write("============FINISHED STATS============" + "\n")
+        bw.write("Only encoding the top " + TOP_K + " partial QEPs" + "\n")
+        bw.write("Number of queries: " + queries.size + "\n")
+        bw.write("Total unique partial QEPs: " + subTreeCount.size + "\n")
+        bw.write("Top 10 frequent partial QEPs:" + "\n")
+        bw.write(subTreeCount.toSeq.sortWith(_._2 > _._2).take(10).toString() + "\n")
+        bw.write("Frequency distribution of top " + TOP_K +" partial QEPs: " + subTreeCount.values.toList.sorted(Ordering.Long.reverse).take(TOP_K) + "\n")
+        bw.write("Number of partial QEPs only occurring once: " + subTreeCount.values.toList.count(_ == 1) + "\n")
 
+        bw.write("Processed queries: " + processedQueries.length + " out of " + queries.length + "\n")
+        bw.write("Finished encoding queries: " + processedQueries.length + " out of " + encodedQueries.length + "\n")
+        bw.close()
 
     }
 
@@ -91,6 +110,19 @@ object Main {
         }
     }
 
+    /**
+     * Transforms the treeDependnecyGraph to one of ids instead of logical plans
+     */
+    def createTreeIdsDependencyGraph(): Unit = {
+        subTreeDependencyGraph foreach {
+            case (lp, subTreeSet) => {
+                if (subTreeIds.contains(lp)) {
+                    val subTreeIdsSet = subTreeSet.filter(p => subTreeIds.contains(p)).map(p => subTreeIds(p))
+                    subTreeIdsDependencyGraph(subTreeIds(lp)) = subTreeIdsSet
+                }
+            }
+        }
+    }
 
     /**
      * Loads the schema of the database by reading 10 rows of each table into its own dataframe
@@ -151,12 +183,13 @@ object Main {
     def queryWorkloadPhoneLabs(): List[String] = {
         var queries: ListBuffer[String] = ListBuffer();
 
-        var src: Iterator[String] = Source.fromFile(LOG_DIR + "2747d54967a32fc95945671b930d57c1d5a9ac02_log.csv").getLines
+        var src: Iterator[String] = Source.fromFile(LOG_DIR + "2747d54967a32fc95945671b930d57c1d5a9ac02_log_fixed.csv").getLines
         src.take(1).next
         for (l <- src) {
 //            println(l.split(";")(3)) // can cause array out of bounds exception for some queries
             // Filter for first day and first hour only to limit number of queries
             if ((l.contains("2015-03-01") ||l.contains("2015-03-02") || l.contains("2015-03-03") || l.contains("2015-03-04") || l.contains("2015-03-05")) && !l.contains("sqlite_master") && !l.contains("INSERT") && l.contains("SELECT") && !l.contains("DELETE") && !l.contains("REPLACE") && !l.contains("UPSERT") && !l.contains("UPDATE")) {
+//            if ((l.contains("2015-03-01")) && !l.contains("sqlite_master") && !l.contains("INSERT") && l.contains("SELECT") && !l.contains("DELETE") && !l.contains("REPLACE") && !l.contains("UPSERT") && !l.contains("UPDATE")) {
                 // Replace question marks with 0
                 var sql_query: String = l.split(";")(3).replace("?", "0").replace("()", "(0)").replace("?group", "? group");
                 // Remove column specifiers for INSERT INTO queries and add 0 for all columns
@@ -192,7 +225,7 @@ object Main {
      */
     def queryWorkloadIoT(): List[String] = {
         var queries: ListBuffer[String] = ListBuffer();
-        val src: Iterator[String] = Source.fromFile(LOG_DIR + "processed.log").getLines
+        val src: Iterator[String] = Source.fromFile(LOG_DIR + "processed_fixed.log").getLines
         for (l <- src) {
             val sql_query: String = l.replace(";", "")
             queries.+=(sql_query)
@@ -272,6 +305,7 @@ object Main {
                 subTrees = subTrees ++ getPartialQEPs(x)
             })
         }
+        subTreeDependencyGraph(lp) = subTrees.filter((p: LogicalPlan) => p != lp)
         subTrees
     }
 
@@ -308,8 +342,31 @@ object Main {
         val csvWriterMap: CSVWriter = new CSVWriter(map, ';')
         csvWriterMap.writeNext("partialQEPId", "partialQEP")
 
-        subTreeIds foreach {case (key, value) => csvWriterMap.writeNext(value.toString, key.toString() + "\n")}
+        subTreeIds foreach {case (key, value) => csvWriterMap.writeNext(value.toString, key.toString())}
 
         map.close()
+
+
+        val uniques: BufferedWriter = new BufferedWriter(new FileWriter(OUTPUT_DIR + DATA_SET + "_output_uniques_" + TOP_K + ".csv"))
+        val csvWriterUniques: CSVWriter = new CSVWriter(uniques, ';')
+        csvWriterUniques.writeNext("frequency", "partialQEP")
+
+        subTreeCount foreach {case (key, value) => {
+            if(value == 1) {
+                csvWriterUniques.writeNext(value.toString, key.toString())
+            }
+
+        }}
+
+        uniques.close()
+
+
+        val dependencyGraph: BufferedWriter = new BufferedWriter(new FileWriter(OUTPUT_DIR + DATA_SET + "_output_dependency_graph_" + TOP_K + ".csv"))
+        val csvWriterDependencyGraph: CSVWriter = new CSVWriter(dependencyGraph, ';')
+        csvWriterDependencyGraph.writeNext("partialQEP", "impliedPartialQEPs")
+
+        subTreeIdsDependencyGraph foreach {case (key: Long, value: Set[Long]) => csvWriterDependencyGraph.writeNext(key.toString, value.toString.replace("Set(", "").replace(")", ""))}
+
+        dependencyGraph.close()
     }
 }

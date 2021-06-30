@@ -1,0 +1,1 @@
+_id;displayName;serverId;parentServerId;parentKey;accountKey;type;delimiter;syncKey;syncLookback;syncInterval;syncTime;unreadCount;flagVisible;flags;visibleLimit;syncStatus;messageCount;lastTouchedTime;uiSyncStatus;uiLastSyncResult;lastNotifiedMessageKey;lastNotifiedMessageCount;totalCount;hierarchicalName;lastFullSyncTime

@@ -1,0 +1,44 @@
+============FINISHED STATS============
+Only encoding the top 5000 partial QEPs
+Number of queries: 111335
+Total unique partial QEPs: 156
+Top 10 frequent partial QEPs:
+ArrayBuffer((LogicalRDD [id#468, name#469, specs#470, created_at#471, updated_at#472], false
+,112), (LogicalRDD [id#842, serial#843, name#844, device_type_id#845, user_id#846, last_known_binary_id#847, properties#848, settings#849, settings_descriptor#850, tags#851, manufactured_at#852, registration_type#853, trial_used#854, webhook_enabled#855, webhook_url#856, webhook_headers#857, created_at#858, updated_at#859, deleted_at#860], false
+,42), (Project [id#405, username#406]
++- Filter isnotnull(id#405)
+   +- LogicalRDD [id#405, username#406, password#407, first_name#408, last_name#409, country#410, birthday#411, invitation_used#412, has_verified_email#413, beta_features#414, can_use_webhooks#415, is_admin#416, enabled#417, created_at#418, updated_at#419, deleted_at#420], false
+,38), (LogicalRDD [sid#1163, user_id#1164, expires#1165, data#1166, created_at#1167, updated_at#1168], false
+,38), (Project [device_id#260, updated_at#263]
++- Filter isnotnull(device_id#260)
+   +- LogicalRDD [id#259, device_id#260, data#261, created_at#262, updated_at#263, deleted_at#264], false
+,38), (LogicalRDD [id#405, username#406, password#407, first_name#408, last_name#409, country#410, birthday#411, invitation_used#412, has_verified_email#413, beta_features#414, can_use_webhooks#415, is_admin#416, enabled#417, created_at#418, updated_at#419, deleted_at#420], false
+,38), (Project [id#842, serial#843, name#844, user_id#846]
++- Filter isnotnull(user_id#846)
+   +- LogicalRDD [id#842, serial#843, name#844, device_type_id#845, user_id#846, last_known_binary_id#847, properties#848, settings#849, settings_descriptor#850, tags#851, manufactured_at#852, registration_type#853, trial_used#854, webhook_enabled#855, webhook_url#856, webhook_headers#857, created_at#858, updated_at#859, deleted_at#860], false
+,38), (Filter isnotnull(user_id#1164)
++- LogicalRDD [sid#1163, user_id#1164, expires#1165, data#1166, created_at#1167, updated_at#1168], false
+,38), (Join LeftOuter, (device_id#260 = id#842)
+:- Project [id#405, username#406, id#842, serial#843, name#844, updated_at#1168]
+:  +- Join LeftOuter, (user_id#1164 = id#405)
+:     :- Project [id#405, username#406, id#842, serial#843, name#844]
+:     :  +- Join Inner, (user_id#846 = id#405)
+:     :     :- Project [id#405, username#406]
+:     :     :  +- Filter isnotnull(id#405)
+:     :     :     +- LogicalRDD [id#405, username#406, password#407, first_name#408, last_name#409, country#410, birthday#411, invitation_used#412, has_verified_email#413, beta_features#414, can_use_webhooks#415, is_admin#416, enabled#417, created_at#418, updated_at#419, deleted_at#420], false
+:     :     +- Project [id#842, serial#843, name#844, user_id#846]
+:     :        +- Filter isnotnull(user_id#846)
+:     :           +- LogicalRDD [id#842, serial#843, name#844, device_type_id#845, user_id#846, last_known_binary_id#847, properties#848, settings#849, settings_descriptor#850, tags#851, manufactured_at#852, registration_type#853, trial_used#854, webhook_enabled#855, webhook_url#856, webhook_headers#857, created_at#858, updated_at#859, deleted_at#860], false
+:     +- Project [user_id#1164, updated_at#1168]
+:        +- Filter isnotnull(user_id#1164)
+:           +- LogicalRDD [sid#1163, user_id#1164, expires#1165, data#1166, created_at#1167, updated_at#1168], false
++- Project [device_id#260, updated_at#263]
+   +- Filter isnotnull(device_id#260)
+      +- LogicalRDD [id#259, device_id#260, data#261, created_at#262, updated_at#263, deleted_at#264], false
+,38), (Filter isnotnull(device_id#260)
++- LogicalRDD [id#259, device_id#260, data#261, created_at#262, updated_at#263, deleted_at#264], false
+,38))
+Frequency distribution of top 5000 partial QEPs: List(112, 42, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 38, 11, 7, 7, 7, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
+Number of partial QEPs only occurring once: 132
+Processed queries: 172 out of 111335
+Finished encoding queries: 172 out of 172

@@ -1,0 +1,1 @@
+_id;id;name;enabled;trigger_channel_id;trigger_id;trigger_verbiage;action_channel_id;action_id;action_verbiage;is_tombstoned;username;trigger_count;last_triggered_at;push_enabled;shared_recipe_id;shared_recipe_name;created_at;updated_at

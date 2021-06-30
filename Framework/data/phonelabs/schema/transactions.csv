@@ -1,0 +1,1 @@
+transaction_id;sender_id;receiver_id;transfer_status;creation_time;updated_time;completed_time;raw_amount;amount_offset;currency

@@ -1,0 +1,1 @@
+_id;uid;file_path;file_name;file_type;file_url_tag;file_chunk_size;upload_chunk_current_index;upload_chunk_count;upload_file_token;upload_file_bypass;upload_file_host;check_filetoken_host;uploaded_chunks

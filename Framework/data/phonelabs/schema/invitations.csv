@@ -1,0 +1,1 @@
+_id;game_id;external_invitation_id;external_inviter_id;creation_timestamp;last_modified_timestamp;description;type;variant;automatch_max_players;automatch_min_players;has_automatch_criteria;inviter_in_circles

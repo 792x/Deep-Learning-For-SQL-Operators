@@ -1,0 +1,1 @@
+_id;local_id;layer_id;layer_version;type;volume_id;content_version;start_position;start_offset;end_position;end_offset;before_selected_text;selected_text;after_selected_text;server_id;server_timestamp;color;notes;should_delete_on_server;segment_index;data_id;image_start_cfi;image_end_cfi;last_used_timestamp

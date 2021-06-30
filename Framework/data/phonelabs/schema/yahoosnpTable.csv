@@ -1,0 +1,1 @@
+ID;deviceID;regURL;subURL;notifSVRIP;notifPort;keepAlive;conRetry;conRetryCount;serviceCheck;serviceRetry;getDevIDRetry;getDevIDRetryCount;isFirstRun;IfSaveLog;httpConTimeout;httpSoTimeout;ifRspStatusQuery;notifSvrIsSSL;cfgTimestamp;cfgValidPeriod;cfgServer;getCfgRetry;getCfgRetryCount;latestMsgID;transactionTimeout

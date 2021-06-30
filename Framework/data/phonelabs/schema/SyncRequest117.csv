@@ -1,0 +1,1 @@
+SyncRequest_id;entryId;requestTime;isCompleted;isPausedManually;isUploadRequestedEver;isImplicit;isConnectivityPolicyOverriden;batchNumber;syncDirectionInBatch;bytesTransferred;attemptCount;uploadUri;uploadSnapshotLastModifiedTime;documentContentId

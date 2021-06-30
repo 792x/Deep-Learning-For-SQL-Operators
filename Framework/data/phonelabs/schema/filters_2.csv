@@ -1,0 +1,1 @@
+_id;server_filter_id;local_filter_id;type;name;sender_operator;sender_value;sender_matchcase;recipient_operator;recipient_value;recipient_matchcase;subject_operator;subject_value;subject_matchcase;body_operator;body_value;body_matchcase;actionType;action_value;filter_sync_status;filter_error

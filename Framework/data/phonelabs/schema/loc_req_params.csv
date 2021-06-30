@@ -1,0 +1,1 @@
+_id;timestamp;status;desired_interval_ms;curr_interval_ms;desired_accuracy;curr_accuracy;desired_min_disp_m;curr_min_disp_m;scheduled_time_delta_ms

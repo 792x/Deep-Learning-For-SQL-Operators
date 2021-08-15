@@ -18,10 +18,7 @@ import org.apache.spark.util.{SizeEstimator, Utils}
 
 import java.math.{MathContext, RoundingMode}
 import java.util.Locale
-import org.apache.spark.sql.execution.CostMode
 import org.apache.spark.sql.types.{BooleanType, DataType, IntegerType, StringType, StructField, StructType, TimestampType, NullType}
-import org.apache.spark.sql.execution.command.{AnalyzeTableCommand, ExplainCommand}
-import org.apache.spark.sql.internal.SQLConf.CBO_ENABLED
 
 import java.sql.Timestamp
 import java.util.concurrent.TimeUnit.NANOSECONDS
@@ -30,11 +27,8 @@ import scala.util.Random
 object Main {
     val sparkSession: SparkSession = SparkSession.builder
         .appName("Taster")
-//        .enableHiveSupport()
         .master("local[*]")
         .getOrCreate();
-//    sparkSession.conf.set(CBO_ENABLED.key, value = true)
-    println("Using CBO: " + sparkSession.conf.get(CBO_ENABLED.key))
     import sparkSession.implicits._
     import sparkSession.sqlContext.implicits._
 
@@ -43,29 +37,33 @@ object Main {
     Logger.getLogger("org.apache.spark").setLevel(Level.WARN)
     Logger.getLogger("org.spark-project").setLevel(Level.WARN)
 
-    val DATA_SET: String = "iot" // "skyserver" | "phonelabs" | "iot"
-    val DATA_DIR: String = "/Users/falker/Documents/Projects/Deep-Learning-For-SQL-Operators/Framework/data/";
+    val DATA_SET: String = "phonelabs" // "skyserver" | "phonelabs" | "iot"
+    val DATA_DIR: String = "./data/";
     val LOG_DIR: String = DATA_DIR + DATA_SET + "/logs/";
     val OUTPUT_DIR: String = DATA_DIR + DATA_SET + "/output/";
     val SCHEMA_DIR: String = DATA_DIR + DATA_SET + "/schema/";
     val USE_DATA_SUBSET: Boolean = false;
-    val TOP_K = 6000;
-    val FILL_DUMMY_DATA: Boolean = true;
-    val NUM_DUMMY_ROWS = 1000000;
+    val TOP_K = 5000;
+    val FILL_DUMMY_DATA: Boolean = false;
+    val NUM_DUMMY_ROWS = 100000;
 
     val tableCounter: mutable.HashMap[String, Int] = new mutable.HashMap[String, Int]()
     var subTreeCount: mutable.HashMap[LogicalPlan, Long] = new mutable.HashMap[LogicalPlan, Long]()
     var subTreeIds: mutable.HashMap[LogicalPlan, Long] = new mutable.HashMap[LogicalPlan, Long]()
     var subTreeComputationTime: mutable.HashMap[Long, Long] = new mutable.HashMap[Long, Long]()
+    var subTreeByteSize: mutable.HashMap[Long, Long] = new mutable.HashMap[Long, Long]()
+    var subTreeRowCount: mutable.HashMap[Long, Long] = new mutable.HashMap[Long, Long]()
     var subTreeDependencyGraph: mutable.HashMap[LogicalPlan, Set[LogicalPlan]] = new mutable.HashMap[LogicalPlan, Set[LogicalPlan]]()
     var subTreeIdsDependencyGraph: mutable.HashMap[Long, Set[Long]] = new mutable.HashMap[Long, Set[Long]]()
     var dataframeSizes: Map[String, Int] = Map[String, Int]()
 
     def main(args: Array[String]): Unit = {
+
+        val start = System.nanoTime()
+
+
         val dataframes: Map[String, DataFrame] = loadSchema()
 
-//        println("Analyzing tables...")
-//        analyzeTables(dataframes)
 
         val queries: List[String] = DATA_SET match {
             case "skyserver" => queryWorkloadSkyserver()
@@ -91,9 +89,14 @@ object Main {
 
         createTreeIdsDependencyGraph()
 
-        analyzeSubTreeComputationTime()
+        analyzeSubTrees()
 
         val encodedQueries: Seq[Set[Long]] = encodeQueries(processedQueries)
+
+
+        val end = System.nanoTime()
+        val duration = NANOSECONDS.toMillis(end - start)
+        println(s"Total Duration: ${duration} ms")
 
         writeToCSV(encodedQueries)
 
@@ -123,6 +126,8 @@ object Main {
         bw.write("Processed queries: " + processedQueries.length + " out of " + queries.length + "\n")
         bw.write("Finished encoding queries: " + processedQueries.length + " out of " + encodedQueries.length + "\n")
         bw.close()
+
+
 
     }
 
@@ -155,21 +160,51 @@ object Main {
      * Evaluates each unique partial QEP in subTreeIds to obtain the running times
      */
 
-    def analyzeSubTreeComputationTime(): Unit = {
+    def analyzeSubTrees(): Unit = {
         subTreeIds foreach {
             case (lp, id) =>
-                val start = System.nanoTime()
-                sparkSession.sessionState.executePlan(lp).toRdd
-                val end = System.nanoTime()
                 println("========== Running Partial QEP ==========")
                 println(lp)
+                val start = System.nanoTime()
+                val res = sparkSession.sessionState.executePlan(lp).toRdd
+                val end = System.nanoTime()
                 val duration = NANOSECONDS.toMillis(end - start)
                 println(s"Time taken: ${duration} ms")
                 subTreeComputationTime(id) = duration
+
+                val calc_rowcount = res.count()
+                val calc_bytes = getRDDSize(res)
+                val est_bytes = sparkSession.sessionState.executePlan(
+                    lp).optimizedPlan.stats.sizeInBytes
+                val est_rowcount = sparkSession.sessionState.executePlan(
+                    lp).optimizedPlan.stats.rowCount.getOrElse(None)
+                println("est sizeInBytes=" + bytesToString(est_bytes) + ", calc sizeInBytes=" + bytesToString(calc_bytes) + ", est rowCount=" + est_rowcount + ", calc rowCount=" + calc_rowcount)
+                subTreeByteSize(id) = calc_bytes
+                subTreeRowCount(id) = calc_rowcount
         }
     }
 
     def randomStringGen(length: Int): String = scala.util.Random.alphanumeric.take(length).mkString
+
+
+    def zeroRowBySchema(schema: StructType): Seq[Any] = {
+        val types = schema.map((f: StructField) => {
+            if (f.name != "deleted_at") {
+                f.dataType
+            } else {
+                NullType
+            }
+        })
+        val dummyrow = types map {
+            case IntegerType => 0
+            case StringType => "0"
+            case TimestampType => new Timestamp(System.currentTimeMillis());
+            case BooleanType => Random.nextBoolean()
+            case NullType => null
+            case _ => "0"
+        }
+        dummyrow
+    }
 
     def randomRowBySchema(schema: StructType): Seq[Any] = {
         val types = schema.map((f: StructField) => {
@@ -180,11 +215,8 @@ object Main {
             }
         })
         val dummyrow = types map {
-            case IntegerType => Random.nextInt(NUM_DUMMY_ROWS / 1000)
-//            case StringType => randomStringGen(5)
-//            case IntegerType => 0
-            case StringType => "0"
-//            case TimestampType => "2014-08-11 07:46:59".asInstanceOf[TimestampType]
+            case IntegerType => Random.nextInt(NUM_DUMMY_ROWS)
+            case StringType => Random.nextInt(NUM_DUMMY_ROWS).toString
             case TimestampType => new Timestamp(System.currentTimeMillis());
             case BooleanType => Random.nextBoolean()
             case NullType => null
@@ -228,14 +260,14 @@ object Main {
                         .load(SCHEMA_DIR + "/" + files(i).getName)
 
                     if (FILL_DUMMY_DATA) {
-                        val lstrows = Seq.fill(NUM_DUMMY_ROWS)(randomRowBySchema(loaded.schema)).toList.map { x => Row(x: _*) }
-//                        .map { x => Row(x: _*) }
+                        var lstrows = Seq.fill(10)(zeroRowBySchema(loaded.schema)).toList.map { x => Row(x: _*) }
+                        lstrows ++= Seq.fill(NUM_DUMMY_ROWS - 10)(randomRowBySchema(loaded.schema)).toList.map { x => Row(x: _*) }
                         val rdd = sparkSession.sparkContext.parallelize(lstrows)
                         val dummy_df = sparkSession.createDataFrame(rdd, loaded.schema)
                         loaded = loaded.union(dummy_df)
-                        dataframes += (filename -> loaded)
-                        sparkSession.createDataFrame(loaded.rdd, loaded.schema).createOrReplaceTempView(filename)
                     }
+                    dataframes += (filename -> loaded)
+                    sparkSession.createDataFrame(loaded.rdd, loaded.schema).createOrReplaceTempView(filename)
                 } catch {
                     case e: Exception =>
                         println("Error occurred for: " + files(i).getName)
@@ -246,20 +278,13 @@ object Main {
 
         sparkSession.catalog.listTables("default").foreach(t => println(t))
 
-        dataframes.keys.foreach((k) => {
-            sparkSession.table(k).printSchema()
-            sparkSession.table(k).cache().count()
+//        dataframes.keys.foreach((k) => {
+//            sparkSession.table(k).printSchema()
+//            sparkSession.table(k).cache().count()
+//            println(k, sparkSession.table(k).count())
+//            println(sparkSession.table(k).head(5).mkString("Array(", ", ", ")"))
+//        })
 
-            sparkSession.table(k).explain(mode="cost")
-
-//            AnalyzeTableCommand(TableIdentifier(k), noscan = false).run(sparkSession)
-
-//            println(sparkSession.sessionState.catalog.tableExists(TableIdentifier("users")))
-//            println(sparkSession.catalog.tableExists("users"))
-
-            println(k, sparkSession.table(k).count())
-            println(sparkSession.table(k).head(5).mkString("Array(", ", ", ")"))
-        })
         dataframeSizes = dataframes.map(pair => (pair._1, pair._2.columns.length))
         dataframes
     }
@@ -333,6 +358,7 @@ object Main {
         println("Processing queries, found: " + queries.length)
         var logicalPlans: ListBuffer[Set[LogicalPlan]] = ListBuffer();
         for (i <- queries.indices) {
+            println("Processing: " + i + "/" + queries.length)
             val query: String = queries(i)
             println(query)
             try {
@@ -348,11 +374,13 @@ object Main {
                 logicalPlans += subTrees
             }
             catch {
-                case e: Exception => println(e)
+                case e: Exception =>
             }
         }
         logicalPlans.toSeq
     }
+
+    def listMean(list:List[Long]): Double = if(list.isEmpty) 0 else list.sum.toDouble/list.size
 
     /**
      * Encodes each element of each set as a unique id based on subTreeIds
@@ -362,9 +390,13 @@ object Main {
      */
 
     def encodeQueries(processedQueries: Seq[Set[LogicalPlan]]): Seq[Set[Long]] = {
+        var encodingTimes: ListBuffer[Long] = ListBuffer();
+
         println("Encoding sets of partial QEPs, found: " + processedQueries.length)
         var encodedQueries: ListBuffer[Set[Long]] = ListBuffer();
         for (i <- processedQueries.indices) {
+            println("Encoding: " + i + "/" + processedQueries.length)
+            val start = System.nanoTime()
             val partialQEPs: Set[LogicalPlan] = processedQueries(i)
             println(partialQEPs)
             var set: Set[Long] = Set[Long]()
@@ -376,7 +408,12 @@ object Main {
             })
             println(set)
             encodedQueries += set
+            val end = System.nanoTime()
+            val duration = NANOSECONDS.toMillis(end - start)
+            encodingTimes += duration
         }
+        println("Encoding queries took: " + encodingTimes.toList.sum + " ms in total")
+        println("Average encoding time per query: " + listMean(encodingTimes.toList) + " ms")
         encodedQueries.toSeq
     }
 
@@ -422,7 +459,6 @@ object Main {
         for (k <- rows.indices) {
             val row = rows(k)
             val len = row.numFields
-//            rddSize += SizeEstimator.estimate(Seq.fill(row.numFields)("12345").map { value => value.asInstanceOf[AnyRef] })
             rddSize += SizeEstimator.estimate(row)
         }
         rddSize
@@ -437,48 +473,6 @@ object Main {
     def getPartialQEPs(lp: LogicalPlan): Set[LogicalPlan] = {
         var subTrees: Set[LogicalPlan] = Set();
         subTreeCount(lp) = subTreeCount.getOrElse[Long](lp, 0) + 1
-
-        println("===== Input partial QEP =====")
-        println(lp)
-        val res = sparkSession.sessionState.executePlan(lp).toRdd
-        val calc_rowcount = res.count()
-        val calc_bytes = getRDDSize(res)
-
-
-//        res.cache.foreach((_: Row) => _ )
-//        val catalyst_plan = sparkSession.sessionState.executePlan(lp).logical
-        val est_bytes = sparkSession.sessionState.executePlan(
-            lp).optimizedPlan.stats.sizeInBytes
-        val est_rowcount = sparkSession.sessionState.executePlan(
-            lp).optimizedPlan.stats.rowCount.getOrElse(None)
-
-//        var sizeInBytes = "n/a";
-//        var rowCount = "n/a";
-//
-//        val statsPattern = "(?<=Statistics\\()(.*)(?=\\))".r
-//        val bytesPattern = "(?<=sizeInBytes=)(.*?)(,|$)".r
-//        val rowCountPattern = "(?<=rowCount=)(.*?)(,|$)".r
-//        val coststring = sparkSession.sessionState.executePlan(lp).explainString(CostMode)
-//        println(coststring)
-//        val matchStats = statsPattern.findFirstIn(coststring)
-//
-//        if (matchStats.isDefined) {
-//            val statistics = matchStats.get
-//            val matchBytes = bytesPattern.findFirstIn(statistics)
-//            val matchRowCount =  rowCountPattern.findFirstIn(statistics)
-//            if (matchBytes.isDefined){
-//                val bytesString = matchBytes.get
-//                sizeInBytes = bytesString.replace(",", "")
-//            }
-//            if (matchRowCount.isDefined){
-//                val rowCountString = matchRowCount.get
-//                rowCount = rowCountString.replace(",", "")
-//            }
-//        }
-
-        println("est sizeInBytes=" + bytesToString(est_bytes) + ", calc sizeInBytes=" + bytesToString(calc_bytes) + ", est rowCount=" + est_rowcount + ", calc rowCount=" + calc_rowcount)
-//        println("sizeInBytes=" + sizeInBytes + ", rowCount=" + rowCount)
-
         subTrees += lp
         if (lp.children.nonEmpty) {
             lp.children.foreach(x => {
@@ -542,10 +536,10 @@ object Main {
 
         val comptime: BufferedWriter = new BufferedWriter(new FileWriter(OUTPUT_DIR + DATA_SET + "_output_comptime_"+ NUM_DUMMY_ROWS +"rows_" + TOP_K + ".csv"))
         val csvWriterComptime: CSVWriter = new CSVWriter(comptime, ';')
-        csvWriterComptime.writeNext("partialQEPId", "computationTime")
+        csvWriterComptime.writeNext("partialQEPId", "computationTime", "byteSize", "rowCount")
 
         subTreeComputationTime foreach {case (key, value) =>
-            csvWriterComptime.writeNext(value.toString, key.toString)
+            csvWriterComptime.writeNext(key.toString, value.toString, subTreeByteSize(key).toString, subTreeRowCount(key).toString)
         }
 
         comptime.close()
